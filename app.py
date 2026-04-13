@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import time
+from datetime import datetime
 
 # ------------------------------
 # PAGE CONFIG & LOGIN
@@ -126,6 +127,7 @@ LANGUAGES = {"English":"en","Español":"es","Français":"fr","Kreyòl Ayisyen":"
 TEXTS = {
     "en": {
         "refresh_btn": "🔄 Refresh Simulated Data",
+        "last_refresh": "Last refresh",
         "pods_title": "📦 Pods",
         "deployments_title": "⚙️ Deployments",
         "services_title": "🔗 Services",
@@ -137,6 +139,7 @@ TEXTS = {
     },
     "es": {
         "refresh_btn": "🔄 Actualizar datos simulados",
+        "last_refresh": "Última actualización",
         "pods_title": "📦 Pods",
         "deployments_title": "⚙️ Despliegues",
         "services_title": "🔗 Servicios",
@@ -148,6 +151,7 @@ TEXTS = {
     },
     "fr": {
         "refresh_btn": "🔄 Actualiser les données simulées",
+        "last_refresh": "Dernière actualisation",
         "pods_title": "📦 Pods",
         "deployments_title": "⚙️ Déploiements",
         "services_title": "🔗 Services",
@@ -159,6 +163,7 @@ TEXTS = {
     },
     "ht": {
         "refresh_btn": "🔄 Mete ajou done simile yo",
+        "last_refresh": "Dènye ajou",
         "pods_title": "📦 Pods",
         "deployments_title": "⚙️ Deplwaman",
         "services_title": "🔗 Sèvis",
@@ -177,14 +182,16 @@ lang_choice = st.sidebar.selectbox("🌐 Language", list(LANGUAGES.keys()))
 st.session_state["language"] = LANGUAGES[lang_choice]
 
 # ------------------------------
-# SIMULATED DATA GENERATION
+# SIMULATED DATA GENERATION (with randomness)
 # ------------------------------
 def generate_pods():
     names = ["nginx-pod", "redis-pod", "api-pod", "worker-pod", "frontend-pod", "db-pod", "cache-pod", "monitor-pod"]
-    statuses = ["Running", "Running", "Running", "Pending", "Running", "Running", "CrashLoopBackOff", "Running"]
+    status_options = ["Running", "Pending", "CrashLoopBackOff", "Running", "Running", "Running", "Running", "Running"]
+    # Randomize statuses each call
+    statuses = [random.choice(["Running", "Pending", "CrashLoopBackOff"]) for _ in range(8)]
     nodes = ["node-1", "node-2", "node-1", "node-3", "node-2", "node-3", "node-1", "node-2"]
-    restarts = [0, 0, 1, 0, 2, 0, 5, 0]
-    ages = ["2d", "3d", "1d", "5h", "2d", "4d", "1h", "2d"]
+    restarts = [random.randint(0, 5) for _ in range(8)]
+    ages = [f"{random.randint(1, 30)}d" for _ in range(8)]
     data = []
     for i in range(8):
         data.append([names[i], statuses[i], nodes[i], restarts[i], ages[i]])
@@ -193,7 +200,7 @@ def generate_pods():
 def generate_deployments():
     names = ["nginx-deploy", "redis-deploy", "api-deploy", "frontend-deploy"]
     replicas = [3, 1, 2, 2]
-    available = [3, 1, 2, 1]
+    available = [random.randint(0, rep) for rep in replicas]
     strategies = ["RollingUpdate", "Recreate", "RollingUpdate", "RollingUpdate"]
     data = list(zip(names, replicas, available, strategies))
     return pd.DataFrame(data, columns=get_text("deploy_cols"))
@@ -201,16 +208,17 @@ def generate_deployments():
 def generate_services():
     names = ["nginx-svc", "redis-svc", "api-svc", "frontend-svc"]
     types = ["ClusterIP", "ClusterIP", "NodePort", "LoadBalancer"]
-    cluster_ips = ["10.96.0.1", "10.96.0.2", "10.96.0.3", "10.96.0.4"]
+    cluster_ips = [f"10.96.{random.randint(0,255)}.{random.randint(1,254)}" for _ in range(4)]
     ports = ["80/TCP", "6379/TCP", "8080:30080/TCP", "80:30000/TCP"]
     data = list(zip(names, types, cluster_ips, ports))
     return pd.DataFrame(data, columns=get_text("service_cols"))
 
 def generate_nodes():
     names = ["node-1", "node-2", "node-3"]
-    statuses = ["Ready", "Ready", "NotReady"]
+    status_options = ["Ready", "NotReady", "Ready", "Ready", "NotReady"]
+    statuses = [random.choice(["Ready", "NotReady"]) for _ in range(3)]
     roles = ["control-plane", "worker", "worker"]
-    ages = ["30d", "30d", "15d"]
+    ages = [f"{random.randint(10, 60)}d" for _ in range(3)]
     versions = ["v1.28", "v1.28", "v1.27"]
     data = list(zip(names, statuses, roles, ages, versions))
     return pd.DataFrame(data, columns=get_text("node_cols"))
@@ -219,8 +227,18 @@ def generate_nodes():
 # MAIN DASHBOARD
 # ------------------------------
 st.markdown("---")
-if st.button(get_text("refresh_btn"), use_container_width=True):
-    st.rerun()
+
+# Refresh button with timestamp
+col_btn, col_time = st.columns([1, 2])
+with col_btn:
+    if st.button(get_text("refresh_btn"), use_container_width=True):
+        st.session_state.refresh_time = datetime.now().strftime("%H:%M:%S")
+        st.rerun()
+with col_time:
+    if "refresh_time" in st.session_state:
+        st.markdown(f"<p style='color:white; text-align:left;'>{get_text('last_refresh')}: {st.session_state.refresh_time}</p>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<p style='color:white; text-align:left;'>{get_text('last_refresh')}: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
